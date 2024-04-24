@@ -198,29 +198,43 @@ nevermind:
         kfree(qs);
 }
 
-void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp)
+void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
 {
     /* The allocation must be dynamic so that the pointer can be reliably freed
      * within the work function.
      */
-    struct qsort *q = kmalloc(sizeof(struct qsort), GFP_KERNEL);
-    struct common common = {
-        .swaptype = ((char *) sort_buffer - (char *) 0) % sizeof(long) ||
-                            es % sizeof(long)
-                        ? 2
-                    : es == sizeof(long) ? 0
-                                         : 1,
-        .es = es,
-        .cmp = cmp,
-    };
+    switch (type) {
+    case 0:
+        printk(KERN_INFO "Do TIMSORT\n");
+        break;
+    case 1:
+        printk(KERN_INFO "Do PDQSORT\n");
+        break;
+    case 2:
+        printk(KERN_INFO "Do LINUXSORT\n");
+        break;
+    case 3:
+        printk(KERN_INFO "Do QSORT\n");
+        struct qsort *q = kmalloc(sizeof(struct qsort), GFP_KERNEL);
+        struct common common = {
+            .swaptype = ((char *) sort_buffer - (char *) 0) % sizeof(long) ||
+                                es % sizeof(long)
+                            ? 2
+                        : es == sizeof(long) ? 0
+                                             : 1,
+            .es = es,
+            .cmp = cmp,
+        };
 
-    init_qsort(q, sort_buffer, size, &common);
+        init_qsort(q, sort_buffer, size, &common);
 
-    queue_work(workqueue, &q->w);
+        queue_work(workqueue, &q->w);
 
-    /* Ensure completion of all work before proceeding, as reliance on objects
-     * allocated on the stack necessitates this. If not, there is a risk of
-     * the work item referencing a pointer that has ceased to exist.
-     */
-    drain_workqueue(workqueue);
+        /* Ensure completion of all work before proceeding, as reliance on
+         * objects allocated on the stack necessitates this. If not, there is a
+         * risk of the work item referencing a pointer that has ceased to exist.
+         */
+        drain_workqueue(workqueue);
+        break;
+    }
 }

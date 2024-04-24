@@ -18,6 +18,8 @@ static dev_t dev = -1;
 static struct cdev cdev;
 static struct class *class;
 
+static int typeOfsort;
+
 struct workqueue_struct *workqueue;
 
 static int sort_open(struct inode *inode, struct file *file)
@@ -59,7 +61,7 @@ static ssize_t sort_read(struct file *file,
      * various types in the future.
      */
     es = sizeof(int);
-    sort_main(sort_buffer, size / es, es, num_compare);
+    sort_main(sort_buffer, size / es, es, num_compare, typeOfsort);
 
     len = copy_to_user(buf, sort_buffer, size);
     if (len != 0)
@@ -74,7 +76,14 @@ static ssize_t sort_write(struct file *file,
                           size_t size,
                           loff_t *offset)
 {
-    return 0;
+    unsigned long len;
+    int *type_buffer = kmalloc(size, GFP_KERNEL);
+
+    len = copy_from_user(type_buffer, buf, size);
+    if (len != 0)
+        return 0;
+    typeOfsort = type_buffer[0];
+    return size;
 }
 
 static const struct file_operations fops = {

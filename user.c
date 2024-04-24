@@ -5,6 +5,10 @@
 #include <unistd.h>
 
 #define KSORT_DEV "/dev/sort"
+#define TIMSORT 0
+#define PDQSORT 1
+#define LINUXSORT 2
+#define QSORT 3
 
 int main()
 {
@@ -17,11 +21,27 @@ int main()
     size_t n_elements = 1000;
     size_t size = n_elements * sizeof(int);
     int *inbuf = malloc(size);
-    if (!inbuf)
+
+    size_t typesize = sizeof(int);
+    int *typebuf = malloc(sizeof(int));
+
+    if (!inbuf || !typebuf)
         goto error;
 
     for (size_t i = 0; i < n_elements; i++)
         inbuf[i] = rand() % n_elements;
+
+
+    // typebuf[0] = TIMSORT;
+    // typebuf[0] = PDQSORT;
+    // typebuf[0] = LINUXSORT;
+    typebuf[0] = QSORT;
+
+    ssize_t type_sz = write(fd, typebuf, typesize);
+    if (type_sz != typesize) {
+        perror("Failed to cheange type of sort");
+        goto error;
+    }
 
     ssize_t r_sz = read(fd, inbuf, size);
     if (r_sz != size) {
