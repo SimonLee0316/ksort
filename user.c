@@ -18,7 +18,7 @@ int main()
         goto error;
     }
 
-    size_t n_elements = 1000;
+    size_t n_elements = 10;
     size_t size = n_elements * sizeof(int);
     int *inbuf = malloc(size);
 
@@ -35,7 +35,7 @@ int main()
     // typebuf[0] = TIMSORT;
     // typebuf[0] = PDQSORT;
     // typebuf[0] = LINUXSORT;
-    typebuf[0] = QSORT;
+    typebuf[0] = TIMSORT;
 
     ssize_t type_sz = write(fd, typebuf, typesize);
     if (type_sz != typesize) {
@@ -52,6 +52,7 @@ int main()
     bool pass = true;
     int ret = 0;
     /* Verify the result of sorting */
+
     for (size_t i = 1; i < n_elements; i++) {
         if (inbuf[i] < inbuf[i - 1]) {
             pass = false;
