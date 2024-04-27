@@ -5,7 +5,6 @@
 #include "sort.h"
 #include "timsort.h"
 
-
 static inline char *med3(char *, char *, char *, cmp_t *, void *);
 static inline void swapfunc(char *, char *, int, int);
 
@@ -56,6 +55,7 @@ static inline char *med3(char *a,
                ? (CMP(thunk, b, c) < 0 ? b : (CMP(thunk, a, c) < 0 ? c : a))
                : (CMP(thunk, b, c) > 0 ? b : (CMP(thunk, a, c) < 0 ? a : c));
 }
+
 struct common {
     int swaptype; /* Code to use for swapping */
     size_t es;    /* Element size. */
@@ -82,6 +82,7 @@ static void init_qsort(struct qsort *q,
     q->n = size;
     q->common = common;
 }
+
 
 static void qsort_algo(struct work_struct *w)
 {
@@ -236,7 +237,45 @@ int timsort_compare(void *priv,
     return res;
 }
 
+struct linuxsort {
+    struct work_struct w;
+    struct commonforlinux *common;
+    void *a;
+    size_t n;
+};
+struct commonforlinux {
+    int swaptype;         /* Code to use for swapping */
+    size_t es;            /* Element size. */
+    cmp_func_t linux_cmp; /* Comparison function */
+};
 
+static void linuxsort_algo(struct work_struct *w);
+static void init_linuxsort(struct linuxsort *ls,
+                           void *elems,
+                           size_t size,
+                           struct commonforlinux *common)
+{
+    INIT_WORK(&ls->w, linuxsort_algo);
+    ls->a = elems;
+    ls->n = size;
+    ls->common = common;
+}
+
+static void linuxsort_algo(struct work_struct *w)
+{
+    struct linuxsort *ls = container_of(w, struct linuxsort, w);
+
+    void *base;       /* Array of elements. */
+    size_t num, size; /* Number of elements; size. */
+    cmp_func_t cmp_func;
+    struct commonforlinux *c;
+    c = ls->common;
+    base = ls->a;
+    num = ls->n;
+    size = c->es;
+    cmp_func = c->linux_cmp;
+    sort(base, num, size, cmp_func, NULL);
+}
 void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
 {
     /* The allocation must be dynamic so that the pointer can be reliably freed
@@ -264,6 +303,15 @@ void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
         break;
     case 2:
         printk(KERN_INFO "Do LINUXSORT\n");
+        struct linuxsort *ls = kmalloc(sizeof(struct linuxsort), GFP_KERNEL);
+        struct commonforlinux commonforlinux = {
+            .swaptype = 0,
+            .es = es,
+            .linux_cmp = cmp,
+        };
+        init_linuxsort(ls, sort_buffer, size, &commonforlinux);
+        queue_work(workqueue, &ls->w);
+        drain_workqueue(workqueue);
         break;
     case 3:
         printk(KERN_INFO "Do QSORT\n");

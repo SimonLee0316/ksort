@@ -35,7 +35,7 @@ int main()
     // typebuf[0] = TIMSORT;
     // typebuf[0] = PDQSORT;
     // typebuf[0] = LINUXSORT;
-    typebuf[0] = TIMSORT;
+    typebuf[0] = LINUXSORT;
 
     ssize_t type_sz = write(fd, typebuf, typesize);
     if (type_sz != typesize) {
