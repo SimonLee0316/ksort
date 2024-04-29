@@ -2,7 +2,9 @@
 
 CPPCHECK_suppresses="--suppress=missingIncludeSystem -i ksort.mod.c \
 --suppress=constParameter : sort_impl.c \
---suppress=unassignedVariable : timsort.c"
+--suppress=unassignedVariable : timsort.c \
+--suppress=arithOperationsOnVoidPointer : pdqsort.c \
+--suppress=unusedFunction : pdqsort.c "
 CPPCHECK_OPTS="-I. --enable=all --error-exitcode=1 --force $CPPCHECK_suppresses ."
 
 RETURN=0

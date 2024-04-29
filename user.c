@@ -31,11 +31,11 @@ int main()
     for (size_t i = 0; i < n_elements; i++)
         inbuf[i] = rand() % n_elements;
 
-
     // typebuf[0] = TIMSORT;
     // typebuf[0] = PDQSORT;
     // typebuf[0] = LINUXSORT;
-    typebuf[0] = LINUXSORT;
+    // typebuf[0] = QSORT;
+    typebuf[0] = PDQSORT;
 
     ssize_t type_sz = write(fd, typebuf, typesize);
     if (type_sz != typesize) {
