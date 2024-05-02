@@ -2,7 +2,6 @@
 #include <linux/sort.h>
 #include <linux/workqueue.h>
 
-#include "pdqsort.h"
 #include "sort.h"
 #include "timsort.h"
 
@@ -278,52 +277,7 @@ static void linuxsort_algo(struct work_struct *w)
     sort(base, num, size, cmp_func, NULL);
 }
 
-/*Pattern Defeating Quicksort*/
-struct pdqsort {
-    struct work_struct w;
-    struct commonforpdqsort *common;
-    void *a;
-    size_t n;
-};
 
-struct commonforpdqsort {
-    int swaptype;       /* Code to use for swapping */
-    size_t es;          /* Element size. */
-    cmp_func_t pdq_cmp; /* Comparison function */
-};
-
-static int pdqsort_cmp(const void *a, const void *b)
-{
-    return *(int *) a < *(int *) b;
-}
-
-static void pdqsort_algo(struct work_struct *w);
-static void init_pdqsort(struct pdqsort *pdqs,
-                         void *elems,
-                         size_t size,
-                         struct commonforpdqsort *common)
-{
-    INIT_WORK(&pdqs->w, pdqsort_algo);
-    pdqs->a = elems;
-    pdqs->n = size;
-    pdqs->common = common;
-}
-
-static void pdqsort_algo(struct work_struct *w)
-{
-    struct pdqsort *pdqs = container_of(w, struct pdqsort, w);
-
-    void *base;       /* Array of elements. */
-    size_t num, size; /* Number of elements; size. */
-    cmp_func_t cmp_func;
-    struct commonforpdqsort *c;
-    c = pdqs->common;
-    base = pdqs->a;
-    num = pdqs->n;
-    size = c->es;
-    cmp_func = c->pdq_cmp;
-    pdqsort(base, num, size, cmp_func, NULL);
-}
 
 void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
 {
@@ -349,15 +303,6 @@ void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
         break;
     case 1:
         printk(KERN_INFO "Do PDQSORT\n");
-        struct pdqsort *pdqs = kmalloc(sizeof(struct pdqsort), GFP_KERNEL);
-        struct commonforpdqsort commonforpdqsort = {
-            .swaptype = 0,
-            .es = es,
-            .pdq_cmp = pdqsort_cmp,
-        };
-        init_pdqsort(pdqs, sort_buffer, size, &commonforpdqsort);
-        queue_work(workqueue, &pdqs->w);
-        drain_workqueue(workqueue);
         break;
     case 2:
         printk(KERN_INFO "Do LINUXSORT\n");
