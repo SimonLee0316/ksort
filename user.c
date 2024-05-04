@@ -12,6 +12,8 @@
 
 int main()
 {
+    bool pass = true;
+    int ret = 0;
     int fd = open(KSORT_DEV, O_RDWR);
     if (fd < 0) {
         perror("Failed to open character device");
@@ -27,40 +29,110 @@ int main()
 
     if (!inbuf || !typebuf)
         goto error;
+    { /*Timsort test*/
+        for (size_t i = 0; i < n_elements; i++)
+            inbuf[i] = rand() % n_elements;
 
-    for (size_t i = 0; i < n_elements; i++)
-        inbuf[i] = rand() % n_elements;
+        // typebuf[0] = TIMSORT;
+        // typebuf[0] = LINUXSORT;
+        // typebuf[0] = QSORT;
+        typebuf[0] = TIMSORT;
 
-    // typebuf[0] = TIMSORT;
-    // typebuf[0] = PDQSORT;
-    // typebuf[0] = LINUXSORT;
-    // typebuf[0] = QSORT;
-    typebuf[0] = TIMSORT;
-
-    ssize_t type_sz = write(fd, typebuf, typesize);
-    if (type_sz != typesize) {
-        perror("Failed to cheange type of sort");
-        goto error;
-    }
-
-    ssize_t r_sz = read(fd, inbuf, size);
-    if (r_sz != size) {
-        perror("Failed to write character device");
-        goto error;
-    }
-
-    bool pass = true;
-    int ret = 0;
-    /* Verify the result of sorting */
-
-    for (size_t i = 1; i < n_elements; i++) {
-        if (inbuf[i] < inbuf[i - 1]) {
-            pass = false;
-            break;
+        ssize_t type_sz = write(fd, typebuf, typesize);
+        if (type_sz != typesize) {
+            perror("Failed to cheange type of sort");
+            goto error;
         }
+
+        ssize_t r_sz = read(fd, inbuf, size);
+        if (r_sz != size) {
+            perror("Failed to write character device");
+            goto error;
+        }
+
+        pass = true;
+        ret = 0;
+        /* Verify the result of sorting */
+
+        for (size_t i = 1; i < n_elements; i++) {
+            if (inbuf[i] < inbuf[i - 1]) {
+                pass = false;
+                break;
+            }
+        }
+
+        printf("Soring %s!\n", pass ? "succeeded" : "failed");
     }
 
-    printf("Soring %s!\n", pass ? "succeeded" : "failed");
+    { /*Linux sort test*/
+        for (size_t i = 0; i < n_elements; i++)
+            inbuf[i] = rand() % n_elements;
+
+        // typebuf[0] = TIMSORT;
+        // typebuf[0] = LINUXSORT;
+        // typebuf[0] = QSORT;
+        typebuf[0] = LINUXSORT;
+
+        ssize_t type_sz = write(fd, typebuf, typesize);
+        if (type_sz != typesize) {
+            perror("Failed to cheange type of sort");
+            goto error;
+        }
+
+        ssize_t r_sz = read(fd, inbuf, size);
+        if (r_sz != size) {
+            perror("Failed to write character device");
+            goto error;
+        }
+
+        pass = true;
+        ret = 0;
+        /* Verify the result of sorting */
+
+        for (size_t i = 1; i < n_elements; i++) {
+            if (inbuf[i] < inbuf[i - 1]) {
+                pass = false;
+                break;
+            }
+        }
+
+        printf("Soring %s!\n", pass ? "succeeded" : "failed");
+    }
+
+    { /*qsort test*/
+        for (size_t i = 0; i < n_elements; i++)
+            inbuf[i] = rand() % n_elements;
+
+        // typebuf[0] = TIMSORT;
+        // typebuf[0] = LINUXSORT;
+        // typebuf[0] = QSORT;
+        typebuf[0] = QSORT;
+
+        ssize_t type_sz = write(fd, typebuf, typesize);
+        if (type_sz != typesize) {
+            perror("Failed to cheange type of sort");
+            goto error;
+        }
+
+        ssize_t r_sz = read(fd, inbuf, size);
+        if (r_sz != size) {
+            perror("Failed to write character device");
+            goto error;
+        }
+
+        pass = true;
+        ret = 0;
+        /* Verify the result of sorting */
+
+        for (size_t i = 1; i < n_elements; i++) {
+            if (inbuf[i] < inbuf[i - 1]) {
+                pass = false;
+                break;
+            }
+        }
+
+        printf("Soring %s!\n", pass ? "succeeded" : "failed");
+    }
 
 error:
     free(inbuf);
