@@ -200,6 +200,40 @@ nevermind:
     if (do_free)
         kfree(qs);
 }
+/*timsort*/
+struct timsort_for_work {
+    struct work_struct w;
+    list_cmp_func_t tim_cmp;
+    struct list_head *sample_head;
+};
+
+static void timsort_func(struct work_struct *w);
+
+static void init_timsort(struct timsort_for_work *t,
+                         struct list_head *head,
+                         list_cmp_func_t cmp)
+{
+    INIT_WORK(&t->w, timsort_func);
+    t->sample_head = head;
+    t->tim_cmp = cmp;
+};
+
+static void timsort_func(struct work_struct *w)
+{
+    struct timsort_for_work *ts = container_of(w, struct timsort_for_work, w);
+
+    if (!ts->sample_head) {
+        printk(KERN_ERR "Error: ts->head is NULL\n");
+        return;
+    }
+
+    if (!ts->tim_cmp) {
+        printk(KERN_ERR "Error: ts->cmp is NULL\n");
+        return;
+    }
+
+    timsort(NULL, ts->sample_head, ts->tim_cmp);
+}
 
 static void copy_buf_to_list(struct list_head *head, int *a, size_t len)
 {
@@ -289,17 +323,14 @@ void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
         printk(KERN_INFO "Do TIMSORT\n");
         struct timsort_for_work *ts =
             kmalloc(sizeof(struct timsort_for_work), GFP_KERNEL);
-        /*initial timsort_for_work*/
-        INIT_WORK(&ts->w, timsort);
-        ts->n = size;
-        ts->tim_cmp = timsort_compare;
-        /*add the sort buffer element into list*/
-        INIT_LIST_HEAD(&ts->sample_head);
-        copy_buf_to_list(&ts->sample_head, sort_buffer, size);
+        struct list_head *head =
+            (struct list_head *) kmalloc(sizeof(*head), GFP_KERNEL);
+        INIT_LIST_HEAD(head);
+        init_timsort(ts, head, timsort_compare);
+        copy_buf_to_list(ts->sample_head, sort_buffer, size);
         queue_work(workqueue, &ts->w);
         drain_workqueue(workqueue);
-        copy_list_to_buf(sort_buffer, &ts->sample_head, size);
-        printk(KERN_INFO "end timsort \n");
+        copy_list_to_buf(sort_buffer, ts->sample_head, size);
         break;
     case 1:
         printk(KERN_INFO "Do PDQSORT\n");

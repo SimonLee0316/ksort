@@ -188,14 +188,8 @@ static struct list_head *merge_collapse(void *priv,
     return tp;
 }
 
-void timsort(struct work_struct *w)
+void timsort(void *priv, struct list_head *head, list_cmp_func_t cmp)
 {
-    printk(KERN_INFO "start timsort \n");
-    struct timsort_for_work *ts = container_of(w, struct timsort_for_work, w);
-    struct list_head *head = &ts->sample_head;
-    void *priv = 0;
-    list_cmp_func_t cmp = ts->tim_cmp;
-
     stk_size = 0;
 
     struct list_head *list = head->next, *tp = NULL;

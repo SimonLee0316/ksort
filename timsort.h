@@ -5,12 +5,6 @@ typedef int (*list_cmp_func_t)(void *,
                                const struct list_head *,
                                const struct list_head *);
 
-struct timsort_for_work {
-    struct work_struct w;
-    size_t n;
-    list_cmp_func_t tim_cmp;
-    struct list_head sample_head;
-};
 
 typedef struct element {
     struct list_head list;
@@ -19,4 +13,4 @@ typedef struct element {
 
 
 
-void timsort(struct work_struct *w);
+void timsort(void *priv, struct list_head *head, list_cmp_func_t cmp);

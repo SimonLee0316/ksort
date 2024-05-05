@@ -37,7 +37,7 @@ int main()
         goto error;
     }
 
-    for (size_t start = 1000; start <= 2000; start += 100) {
+    for (size_t start = 1000; start <= 1000; start += 500) {
         size_t n_elements = start;
         size_t size = n_elements * sizeof(int);
         int *inbuf = malloc(size);
@@ -50,6 +50,7 @@ int main()
             free(typebuf);
             goto error;
         }
+
         { /*Timsort test*/
             for (size_t i = 0; i < n_elements; i++)
                 inbuf[i] = rand() % n_elements;
@@ -83,7 +84,7 @@ int main()
             Timsort_diff =
                 (Timsort_end.tv_sec - Timsort_start.tv_sec) * 1000000000LL +
                 (Timsort_end.tv_nsec - Timsort_start.tv_nsec);
-            printf("TIMSORT Time taken: %lld nanoseconds\n", Timsort_diff);
+            // printf("TIMSORT Time taken: %lld nanoseconds\n", Timsort_diff);
 
             if (r_sz != size) {
                 perror("Failed to write character device");
@@ -139,7 +140,8 @@ int main()
                 (Linuxsort_end.tv_sec - Linuxsort_start.tv_sec) * 1000000000LL +
                 (Linuxsort_end.tv_nsec - Linuxsort_start.tv_nsec);
 
-            printf("LINUXSORT Time taken: %lld nanoseconds\n", Linuxsort_diff);
+            // printf("LINUXSORT Time taken: %lld nanoseconds\n",
+            // Linuxsort_diff);
 
             if (r_sz != size) {
                 perror("Failed to write character device");
@@ -195,7 +197,7 @@ int main()
                 (Qsort_end.tv_sec - Qsort_start.tv_sec) * 1000000000LL +
                 (Qsort_end.tv_nsec - Qsort_start.tv_nsec);
 
-            printf("QSORT Time taken: %lld nanoseconds\n", Qsort_diff);
+            // printf("QSORT Time taken: %lld nanoseconds\n", Qsort_diff);
 
             if (r_sz != size) {
                 perror("Failed to write character device");

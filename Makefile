@@ -48,3 +48,4 @@ clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 	$(RM) user test_xoro
 	rm -rf output.csv
+	rm -rf time_analysis.png
