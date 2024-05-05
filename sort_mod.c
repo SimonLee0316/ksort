@@ -6,6 +6,7 @@
 #include <linux/version.h>
 
 #include "sort.h"
+#include "sort_types.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -18,9 +19,10 @@ static dev_t dev = -1;
 static struct cdev cdev;
 static struct class *class;
 
-static int typeOfsort;
+static sort_method_t sort_method = TIMSORT;
 
 struct workqueue_struct *workqueue;
+
 
 static int sort_open(struct inode *inode, struct file *file)
 {
@@ -32,16 +34,14 @@ static int sort_release(struct inode *inode, struct file *file)
     return 0;
 }
 
-static int num_compare(const void *a, const void *b)
-{
-    return (*(int *) a - *(int *) b);
-}
-
 static ssize_t sort_read(struct file *file,
                          char *buf,
                          size_t size,
                          loff_t *offset)
 {
+    if (!is_valid_sort_method(sort_method))
+        return 0;
+
     unsigned long len;
     size_t es;
 
@@ -61,7 +61,7 @@ static ssize_t sort_read(struct file *file,
      * various types in the future.
      */
     es = sizeof(int);
-    sort_main(sort_buffer, size / es, es, num_compare, typeOfsort);
+    sort_main(sort_buffer, size / es, es, sort_method);
 
     len = copy_to_user(buf, sort_buffer, size);
     if (len != 0)
@@ -76,16 +76,28 @@ static ssize_t sort_write(struct file *file,
                           size_t size,
                           loff_t *offset)
 {
-    unsigned long len;
-    int *type_buffer = kmalloc(size, GFP_KERNEL);
+    int method;
+    if (size != sizeof(method)) {
+        printk(KERN_INFO "Expected %lu bytes but got %lu bytes\n",
+               sizeof(method), size);
+        return -EINVAL;
+    }
 
-    len = copy_from_user(type_buffer, buf, size);
-    if (len != 0)
-        return 0;
-    typeOfsort = type_buffer[0];
-    return size;
+    if (copy_from_user(&method, buf, sizeof(int))) {
+        return -EFAULT;
+    }
+
+    if (!is_valid_sort_method(method)) {
+        printk(KERN_INFO "Invalid sort method: %d\n", method);
+        return -EINVAL;
+    }
+
+    sort_method = (sort_method_t) method;
+    printk(KERN_INFO "Set sort method: %s\n",
+           get_sort_method_name(sort_method));
+
+    return sizeof(method);
 }
-
 static const struct file_operations fops = {
     .read = sort_read,
     .write = sort_write,

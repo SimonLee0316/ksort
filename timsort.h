@@ -1,16 +1,22 @@
-#include <linux/workqueue.h>
-struct list_head;
+#ifndef TIMSORT_H
+#define TIMSORT_H
 
-typedef int (*list_cmp_func_t)(void *,
-                               const struct list_head *,
-                               const struct list_head *);
+#include <linux/types.h>
 
-
-typedef struct element {
-    struct list_head list;
+typedef struct {
     int val;
+    struct list_head list;
 } element_t;
 
 
+/* Compare function type for list */
+typedef bool (*list_cmp_func_t)(void *,
+                                struct list_head *,
+                                struct list_head *,
+                                bool);
 
-void timsort(void *priv, struct list_head *head, list_cmp_func_t cmp);
+
+
+void timsort_algo(void *priv, struct list_head *head, list_cmp_func_t cmp);
+
+#endif  // TIMSORT_H

@@ -200,94 +200,93 @@ nevermind:
     if (do_free)
         kfree(qs);
 }
+
 /*timsort*/
-struct timsort_for_work {
+struct timsort {
     struct work_struct w;
-    list_cmp_func_t tim_cmp;
-    struct list_head *sample_head;
+    struct list_head *head;
+    list_cmp_func_t cmp;
 };
 
 static void timsort_func(struct work_struct *w);
 
-static void init_timsort(struct timsort_for_work *t,
+static void init_timsort(struct timsort *t,
                          struct list_head *head,
                          list_cmp_func_t cmp)
 {
     INIT_WORK(&t->w, timsort_func);
-    t->sample_head = head;
-    t->tim_cmp = cmp;
-};
+    t->head = head;
+    t->cmp = cmp;
+}
 
 static void timsort_func(struct work_struct *w)
 {
-    struct timsort_for_work *ts = container_of(w, struct timsort_for_work, w);
+    struct timsort *ts = container_of(w, struct timsort, w);
 
-    if (!ts->sample_head) {
+    if (!ts->head) {
         printk(KERN_ERR "Error: ts->head is NULL\n");
         return;
     }
 
-    if (!ts->tim_cmp) {
+    if (!ts->cmp) {
         printk(KERN_ERR "Error: ts->cmp is NULL\n");
         return;
     }
 
-    timsort(NULL, ts->sample_head, ts->tim_cmp);
+    timsort_algo(NULL, ts->head, ts->cmp);
 }
-
-static void copy_buf_to_list(struct list_head *head, int *a, size_t len)
+/* Function for list */
+static void buf_to_list(struct list_head *head, void *buf, size_t size)
 {
-    for (size_t i = 0; i < len; i++) {
-        element_t *new = kmalloc(sizeof(element_t), GFP_KERNEL);
-        new->val = a[i];
-        list_add_tail(&new->list, head);
+    int *int_buf = (int *) buf;
+    for (size_t i = 0; i < size; i++) {
+        element_t *new_node = kmalloc(sizeof(*new_node), GFP_KERNEL);
+        if (!new_node) {
+            printk(KERN_ERR "Failed to allocate memory for new node\n");
+            return;
+        }
+        new_node->val = int_buf[i];
+        list_add_tail(&new_node->list, head);
     }
 }
 
-static void copy_list_to_buf(int *a, struct list_head *head, size_t len)
+bool list_cmp(void *priv,
+              struct list_head *a,
+              struct list_head *b,
+              bool descend)
 {
-    element_t *cur;
-    int i = 0;
-    list_for_each_entry (cur, head, list) {
-        a[i] = cur->val;
-        i++;
-    }
+    if (priv)
+        *((unsigned long long *) priv) += 1;
+    element_t *a_entry = list_entry(a, element_t, list);
+    element_t *b_entry = list_entry(b, element_t, list);
+    return (a_entry->val > b_entry->val) ^ descend;
 }
-
-int timsort_compare(void *priv,
-                    const struct list_head *a,
-                    const struct list_head *b)
+static void list_to_buf(struct list_head *head, void *buf, size_t size)
 {
-    if (a == b)
-        return 0;
+    int *int_buf = (int *) buf;
+    struct list_head *pos;
+    element_t *entry;
+    size_t i = 0;
 
-    int res = list_entry(a, element_t, list)->val -
-              list_entry(b, element_t, list)->val;
-
-    if (priv) {
-        *((int *) priv) += 1;
+    list_for_each (pos, head) {
+        entry = list_entry(pos, element_t, list);
+        int_buf[i++] = entry->val;
     }
-
-    return res;
 }
 /*linux sort.h*/
 struct linuxsort {
     struct work_struct w;
-    struct commonforlinux *common;
+    struct common *common;
     void *a;
     size_t n;
 };
-struct commonforlinux {
-    int swaptype;         /* Code to use for swapping */
-    size_t es;            /* Element size. */
-    cmp_func_t linux_cmp; /* Comparison function */
-};
 
 static void linuxsort_algo(struct work_struct *w);
+
 static void init_linuxsort(struct linuxsort *ls,
                            void *elems,
                            size_t size,
-                           struct commonforlinux *common)
+                           struct common *common)
 {
     INIT_WORK(&ls->w, linuxsort_algo);
     ls->a = elems;
@@ -299,66 +298,87 @@ static void linuxsort_algo(struct work_struct *w)
 {
     struct linuxsort *ls = container_of(w, struct linuxsort, w);
 
-    void *base;       /* Array of elements. */
-    size_t num, size; /* Number of elements; size. */
-    cmp_func_t cmp_func;
-    struct commonforlinux *c;
+    void *a;  /* Array of elements. */
+    size_t n; /* Number of elements; size. */
+    cmp_t *cmp;
+    struct common *c;
+
+    /* Initialize linux sort arguments. */
     c = ls->common;
-    base = ls->a;
-    num = ls->n;
-    size = c->es;
-    cmp_func = c->linux_cmp;
-    sort(base, num, size, cmp_func, NULL);
+    cmp = c->cmp;
+    a = ls->a;
+    n = ls->n;
+
+    sort(a, n, sizeof(int), cmp, NULL);
 }
 
+int num_cmp(const void *a, const void *b)
+{
+    return (*(int *) a - *(int *) b);
+}
 
-
-void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
+void sort_main(void *sort_buffer,
+               size_t size,
+               size_t es,
+               sort_method_t sort_method)
 {
     /* The allocation must be dynamic so that the pointer can be reliably freed
      * within the work function.
      */
-    switch (type) {
-    case 0:
+    struct common common;
+    switch (sort_method) {
+    case TIMSORT:
         printk(KERN_INFO "Do TIMSORT\n");
-        struct timsort_for_work *ts =
-            kmalloc(sizeof(struct timsort_for_work), GFP_KERNEL);
+
+        struct timsort *t = kmalloc(sizeof(struct timsort), GFP_KERNEL);
+
         struct list_head *head =
             (struct list_head *) kmalloc(sizeof(*head), GFP_KERNEL);
         INIT_LIST_HEAD(head);
-        init_timsort(ts, head, timsort_compare);
-        copy_buf_to_list(ts->sample_head, sort_buffer, size);
-        queue_work(workqueue, &ts->w);
+
+        buf_to_list(head, sort_buffer, size);
+
+        init_timsort(t, head, list_cmp);
+
+        queue_work(workqueue, &t->w);
+
         drain_workqueue(workqueue);
-        copy_list_to_buf(sort_buffer, ts->sample_head, size);
+
+        list_to_buf(head, sort_buffer, size);
+
+        /* Free list */
+        element_t *node, *safe;
+        list_for_each_entry_safe (node, safe, head, list) {
+            list_del(&node->list);
+            kfree(node);
+        }
         break;
-    case 1:
-        printk(KERN_INFO "Do PDQSORT\n");
-        break;
-    case 2:
+    case LINUX_SORT:
         printk(KERN_INFO "Do LINUXSORT\n");
+
         struct linuxsort *ls = kmalloc(sizeof(struct linuxsort), GFP_KERNEL);
-        struct commonforlinux commonforlinux = {
-            .swaptype = 0,
-            .es = es,
-            .linux_cmp = cmp,
-        };
-        init_linuxsort(ls, sort_buffer, size, &commonforlinux);
+
+        common.cmp = num_cmp;
+
+        init_linuxsort(ls, sort_buffer, size, &common);
+
         queue_work(workqueue, &ls->w);
+
         drain_workqueue(workqueue);
+
         break;
-    case 3:
+    case QSORT:
         printk(KERN_INFO "Do QSORT\n");
+
         struct qsort *q = kmalloc(sizeof(struct qsort), GFP_KERNEL);
-        struct common common = {
-            .swaptype = ((char *) sort_buffer - (char *) 0) % sizeof(long) ||
-                                es % sizeof(long)
-                            ? 2
-                        : es == sizeof(long) ? 0
-                                             : 1,
-            .es = es,
-            .cmp = cmp,
-        };
+
+        common.swaptype = ((char *) sort_buffer - (char *) 0) % sizeof(long) ||
+                                  es % sizeof(long)
+                              ? 2
+                          : es == sizeof(long) ? 0
+                                               : 1;
+        common.es = es;
+        common.cmp = num_cmp;
 
         init_qsort(q, sort_buffer, size, &common);
 
@@ -370,5 +390,11 @@ void sort_main(void *sort_buffer, size_t size, size_t es, cmp_t cmp, int type)
          */
         drain_workqueue(workqueue);
         break;
+    case PDQSORT:
+        printk(KERN_INFO "Start sorting: pdqsort\n");
+        break;
+    default:
+        printk(KERN_WARNING "Unknown sort method selected\n");
+        return;
     }
 }

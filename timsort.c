@@ -1,33 +1,21 @@
 #include "timsort.h"
+#include <linux/slab.h>
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
 
-
-static inline size_t run_size(struct list_head *head)
+static struct list_head *merge(
+    void *priv,
+    bool (*cmp)(void *priv, struct list_head *, struct list_head *, bool),
+    struct list_head *a,
+    struct list_head *b,
+    bool descend)
 {
-    if (!head)
-        return 0;
-    if (!head->next)
-        return 1;
-    return (size_t) (head->next->prev);
-}
-
-struct pair {
-    struct list_head *head, *next;
-};
-
-static size_t stk_size;
-
-static struct list_head *merge(void *priv,
-                               list_cmp_func_t cmp,
-                               struct list_head *a,
-                               struct list_head *b)
-{
-    struct list_head *head;
-    struct list_head **tail = &head;
+    struct list_head *head = NULL, **tail = &head;
 
     for (;;) {
         /* if equal, take 'a' -- important for sort stability */
-        if (cmp(priv, a, b) <= 0) {
+        if (!cmp(priv, a, b, descend)) {
             *tail = a;
             tail = &a->next;
             a = a->next;
@@ -48,33 +36,20 @@ static struct list_head *merge(void *priv,
     return head;
 }
 
-static void build_prev_link(struct list_head *head,
-                            struct list_head *tail,
-                            struct list_head *list)
-{
-    tail->next = list;
-    do {
-        list->prev = tail;
-        tail = list;
-        list = list->next;
-    } while (list);
-
-    /* The final links to make a circular doubly-linked list */
-    tail->next = head;
-    head->prev = tail;
-}
-
-static void merge_final(void *priv,
-                        list_cmp_func_t cmp,
-                        struct list_head *head,
-                        struct list_head *a,
-                        struct list_head *b)
+static void merge_final(
+    void *priv,
+    bool (*cmp)(void *priv, struct list_head *, struct list_head *, bool),
+    struct list_head *head,
+    struct list_head *a,
+    struct list_head *b,
+    bool descend)
 {
     struct list_head *tail = head;
+    size_t count = 0;
 
     for (;;) {
         /* if equal, take 'a' -- important for sort stability */
-        if (cmp(priv, a, b) <= 0) {
+        if (!cmp(priv, a, b, descend)) {
             tail->next = a;
             a->prev = tail;
             tail = a;
@@ -94,7 +69,50 @@ static void merge_final(void *priv,
     }
 
     /* Finish linking remainder of list b on to tail */
-    build_prev_link(head, tail, b);
+    tail->next = b;
+    do {
+        if (unlikely(!++count))
+            cmp(priv, b, b, descend);
+        b->prev = tail;
+        tail = b;
+        b = b->next;
+    } while (b);
+
+    /* And the final links to make a circular doubly-linked list */
+    tail->next = head;
+    head->prev = tail;
+}
+
+/* Timsort */
+static inline size_t run_size(struct list_head *head)
+{
+    if (!head)
+        return 0;
+    if (!head->next)
+        return 1;
+    return (size_t) (head->next->prev);
+}
+
+struct pair {
+    struct list_head *head, *next;
+};
+
+static size_t stk_size;
+
+static void build_prev_link(struct list_head *head,
+                            struct list_head *tail,
+                            struct list_head *list)
+{
+    tail->next = list;
+    do {
+        list->prev = tail;
+        tail = list;
+        list = list->next;
+    } while (list);
+
+    /* The final links to make a circular doubly-linked list */
+    tail->next = head;
+    head->prev = tail;
 }
 
 static struct pair find_run(void *priv,
@@ -110,7 +128,7 @@ static struct pair find_run(void *priv,
         return result;
     }
 
-    if (cmp(priv, list, next) > 0) {
+    if (cmp(priv, list, next, 0) > 0) {
         /* decending run, also reverse the list */
         struct list_head *prev = NULL;
         do {
@@ -120,14 +138,14 @@ static struct pair find_run(void *priv,
             list = next;
             next = list->next;
             head = list;
-        } while (next && cmp(priv, list, next) > 0);
+        } while (next && cmp(priv, list, next, 0) > 0);
         list->next = prev;
     } else {
         do {
             len++;
             list = next;
             next = list->next;
-        } while (next && cmp(priv, list, next) <= 0);
+        } while (next && cmp(priv, list, next, 0) == 0);
         list->next = NULL;
     }
     head->prev = NULL;
@@ -142,7 +160,7 @@ static struct list_head *merge_at(void *priv,
 {
     size_t len = run_size(at) + run_size(at->prev);
     struct list_head *prev = at->prev->prev;
-    struct list_head *list = merge(priv, cmp, at->prev, at);
+    struct list_head *list = merge(priv, cmp, at->prev, at, 0);
     list->prev = prev;
     list->next->prev = (struct list_head *) len;
     --stk_size;
@@ -188,8 +206,9 @@ static struct list_head *merge_collapse(void *priv,
     return tp;
 }
 
-void timsort(void *priv, struct list_head *head, list_cmp_func_t cmp)
+void timsort_algo(void *priv, struct list_head *head, list_cmp_func_t cmp)
 {
+    printk(KERN_INFO "Start timsort_algo\n");
     stk_size = 0;
 
     struct list_head *list = head->next, *tp = NULL;
@@ -220,5 +239,5 @@ void timsort(void *priv, struct list_head *head, list_cmp_func_t cmp)
         build_prev_link(head, head, stk0);
         return;
     }
-    merge_final(priv, cmp, head, stk1, stk0);
+    merge_final(priv, cmp, head, stk1, stk0, 0);
 }
