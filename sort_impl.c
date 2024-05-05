@@ -326,6 +326,7 @@ ktime_t sort_main(void *sort_buffer,
     /* The allocation must be dynamic so that the pointer can be reliably freed
      * within the work function.
      */
+    int cpu_id = 0;
     static ktime_t kt;  // evaluate kernal module sorting time
 
     struct common common;
@@ -344,8 +345,8 @@ ktime_t sort_main(void *sort_buffer,
         init_timsort(t, head, list_cmp);
 
         kt = ktime_get(); /*sorting time*/
-        queue_work(workqueue, &t->w);
-
+        queue_work_on(cpu_id, workqueue, &t->w);
+        // queue_work(workqueue, &t->w); if dont want task work on Specify cpu
         drain_workqueue(workqueue);
         kt = ktime_sub(ktime_get(), kt);
 
@@ -368,8 +369,8 @@ ktime_t sort_main(void *sort_buffer,
         init_linuxsort(ls, sort_buffer, size, &common);
 
         kt = ktime_get(); /*sorting time*/
-        queue_work(workqueue, &ls->w);
-
+        queue_work_on(cpu_id, workqueue, &ls->w);
+        // queue_work(workqueue, &ls->w); if dont want task work on Specify cpu
         drain_workqueue(workqueue);
         kt = ktime_sub(ktime_get(), kt);
 
@@ -390,7 +391,9 @@ ktime_t sort_main(void *sort_buffer,
         init_qsort(q, sort_buffer, size, &common);
 
         kt = ktime_get();
-        queue_work(workqueue, &q->w);
+        queue_work_on(cpu_id, workqueue, &q->w);
+        // queue_work_on(workqueue, &q->w); if dont want task work on Specify
+        // cpu
 
         /* Ensure completion of all work before proceeding, as reliance on
          * objects allocated on the stack necessitates this. If not, there is a
