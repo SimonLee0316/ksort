@@ -41,7 +41,10 @@ check: all
 	sudo ./user
 	sudo ./test_xoro
 	$(MAKE) rmmod
+plot:
+	sudo gnuplot plot_script.gp
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 	$(RM) user test_xoro
+	rm -rf output.csv
