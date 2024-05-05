@@ -3,6 +3,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/time.h>
 #include <linux/version.h>
 
 #include "sort.h"
@@ -23,6 +24,7 @@ static sort_method_t sort_method = TIMSORT;
 
 struct workqueue_struct *workqueue;
 
+static ktime_t kt;  // evaluate kernal module sorting time
 
 static int sort_open(struct inode *inode, struct file *file)
 {
@@ -61,7 +63,8 @@ static ssize_t sort_read(struct file *file,
      * various types in the future.
      */
     es = sizeof(int);
-    sort_main(sort_buffer, size / es, es, sort_method);
+
+    kt = sort_main(sort_buffer, size / es, es, sort_method);
 
     len = copy_to_user(buf, sort_buffer, size);
     if (len != 0)
@@ -98,11 +101,17 @@ static ssize_t sort_write(struct file *file,
 
     return sizeof(method);
 }
+
+static long sort_time(struct file *file, unsigned int cmd, unsigned long arg)
+{
+    return (long) ktime_to_ns(kt);
+}
 static const struct file_operations fops = {
     .read = sort_read,
     .write = sort_write,
     .open = sort_open,
     .release = sort_release,
+    .unlocked_ioctl = sort_time,
     .owner = THIS_MODULE,
 };
 

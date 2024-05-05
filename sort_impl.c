@@ -1,5 +1,6 @@
 #include <linux/slab.h>
 #include <linux/sort.h>
+#include <linux/time.h>
 #include <linux/workqueue.h>
 
 #include "sort.h"
@@ -317,14 +318,16 @@ int num_cmp(const void *a, const void *b)
     return (*(int *) a - *(int *) b);
 }
 
-void sort_main(void *sort_buffer,
-               size_t size,
-               size_t es,
-               sort_method_t sort_method)
+ktime_t sort_main(void *sort_buffer,
+                  size_t size,
+                  size_t es,
+                  sort_method_t sort_method)
 {
     /* The allocation must be dynamic so that the pointer can be reliably freed
      * within the work function.
      */
+    static ktime_t kt;  // evaluate kernal module sorting time
+
     struct common common;
     switch (sort_method) {
     case TIMSORT:
@@ -340,9 +343,11 @@ void sort_main(void *sort_buffer,
 
         init_timsort(t, head, list_cmp);
 
+        kt = ktime_get(); /*sorting time*/
         queue_work(workqueue, &t->w);
 
         drain_workqueue(workqueue);
+        kt = ktime_sub(ktime_get(), kt);
 
         list_to_buf(head, sort_buffer, size);
 
@@ -362,9 +367,11 @@ void sort_main(void *sort_buffer,
 
         init_linuxsort(ls, sort_buffer, size, &common);
 
+        kt = ktime_get(); /*sorting time*/
         queue_work(workqueue, &ls->w);
 
         drain_workqueue(workqueue);
+        kt = ktime_sub(ktime_get(), kt);
 
         break;
     case QSORT:
@@ -382,6 +389,7 @@ void sort_main(void *sort_buffer,
 
         init_qsort(q, sort_buffer, size, &common);
 
+        kt = ktime_get();
         queue_work(workqueue, &q->w);
 
         /* Ensure completion of all work before proceeding, as reliance on
@@ -389,12 +397,14 @@ void sort_main(void *sort_buffer,
          * risk of the work item referencing a pointer that has ceased to exist.
          */
         drain_workqueue(workqueue);
+        kt = ktime_sub(ktime_get(), kt);
         break;
     case PDQSORT:
         printk(KERN_INFO "Start sorting: pdqsort\n");
         break;
     default:
         printk(KERN_WARNING "Unknown sort method selected\n");
-        return;
+        break;
     }
+    return kt;
 }

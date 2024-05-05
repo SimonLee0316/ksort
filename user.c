@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -15,9 +16,12 @@
 
 
 typedef struct {
-    unsigned long long qsort;
-    unsigned long long timsort;
-    unsigned long long linuxsort;
+    unsigned long long qsort_user;
+    unsigned long long timsort_user;
+    unsigned long long linuxsort_user;
+    unsigned long long qsort_kernal;
+    unsigned long long timsort_kernal;
+    unsigned long long linuxsort_kernal;
 } sorttime;
 
 sorttime time_analysis(size_t);
@@ -31,8 +35,10 @@ int main()
 
     for (size_t k = start; k <= end; k += step) {
         result = time_analysis(k);
-        fprintf(file, "%zu,%llu,%llu,%llu\n", k, result.qsort, result.timsort,
-                result.linuxsort);
+        fprintf(file, "%zu,%llu,%llu,%llu,%llu,%llu,%llu\n", k,
+                result.qsort_user, result.timsort_user, result.linuxsort_user,
+                result.qsort_kernal, result.timsort_kernal,
+                result.linuxsort_kernal);
     }
     fclose(file);
     return 0;
@@ -87,8 +93,8 @@ sorttime time_analysis(size_t num)
             goto error;
         }
 
-        time.timsort = (end.tv_sec - start.tv_sec) * 1000000000LL +
-                       (end.tv_nsec - start.tv_nsec);
+        time.timsort_user = (end.tv_sec - start.tv_sec) * 1000000000LL +
+                            (end.tv_nsec - start.tv_nsec);
         pass = true;
         /* Verify the result of sorting */
 
@@ -98,6 +104,8 @@ sorttime time_analysis(size_t num)
                 break;
             }
         }
+        time.timsort_kernal = (unsigned long long) ioctl(fd, 0, 0);
+        // printf("tim sort kernal time %llu\n", time.timsort_kernal);
 
         printf("Soring %s!\n", pass ? "succeeded" : "failed");
     }
@@ -128,8 +136,8 @@ sorttime time_analysis(size_t num)
             goto error;
         }
 
-        time.linuxsort = (end.tv_sec - start.tv_sec) * 1000000000LL +
-                         (end.tv_nsec - start.tv_nsec);
+        time.linuxsort_user = (end.tv_sec - start.tv_sec) * 1000000000LL +
+                              (end.tv_nsec - start.tv_nsec);
 
         pass = true;
         /* Verify the result of sorting */
@@ -140,6 +148,9 @@ sorttime time_analysis(size_t num)
                 break;
             }
         }
+
+        time.linuxsort_kernal = (unsigned long long) ioctl(fd, 0, 0);
+        // printf("tim sort kernal time %llu\n", time.linuxsort_kernal);
 
         printf("Soring %s!\n", pass ? "succeeded" : "failed");
     }
@@ -169,8 +180,8 @@ sorttime time_analysis(size_t num)
             perror("Failed to write character device");
             goto error;
         }
-        time.qsort = (end.tv_sec - start.tv_sec) * 1000000000LL +
-                     (end.tv_nsec - start.tv_nsec);
+        time.qsort_user = (end.tv_sec - start.tv_sec) * 1000000000LL +
+                          (end.tv_nsec - start.tv_nsec);
 
         pass = true;
         /* Verify the result of sorting */
@@ -181,6 +192,9 @@ sorttime time_analysis(size_t num)
                 break;
             }
         }
+
+        time.qsort_kernal = (unsigned long long) ioctl(fd, 0, 0);
+        // printf("tim sort kernal time %llu\n", time.qsort_kernal);
 
         printf("Soring %s!\n", pass ? "succeeded" : "failed");
     }
