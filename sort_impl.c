@@ -87,6 +87,13 @@ static void init_qsort(struct qsort *q,
 
 static void qsort_algo(struct work_struct *w)
 {
+    // /* Pretend to simulate access to per-CPU data, disabling preemption
+    //         * during the pr_info().
+    //         */
+    // int cpu = get_cpu();
+    // pr_info("sort: [CPU#%d] %s\n", cpu, __func__);
+    // put_cpu();
+
     struct qsort *qs = container_of(w, struct qsort, w);
 
     bool do_free = true;
@@ -234,6 +241,13 @@ static void timsort_func(struct work_struct *w)
         return;
     }
 
+    // /* Pretend to simulate access to per-CPU data, disabling preemption
+    //         * during the pr_info().
+    //         */
+    // int cpu = get_cpu();
+    // pr_info("sort: [CPU#%d] %s\n", cpu, __func__);
+    // put_cpu();
+
     timsort_algo(NULL, ts->head, ts->cmp);
 }
 /* Function for list */
@@ -310,6 +324,13 @@ static void linuxsort_algo(struct work_struct *w)
     a = ls->a;
     n = ls->n;
 
+    // /* Pretend to simulate access to per-CPU data, disabling preemption
+    //         * during the pr_info().
+    //         */
+    // int cpu = get_cpu();
+    // pr_info("sort: [CPU#%d] %s\n", cpu, __func__);
+    // put_cpu();
+
     sort(a, n, sizeof(int), cmp, NULL);
 }
 
@@ -326,7 +347,7 @@ ktime_t sort_main(void *sort_buffer,
     /* The allocation must be dynamic so that the pointer can be reliably freed
      * within the work function.
      */
-    int cpu_id = 0;
+    int cpu_id = 15;
     static ktime_t kt;  // evaluate kernal module sorting time
 
     struct common common;
