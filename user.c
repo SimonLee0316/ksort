@@ -1,5 +1,7 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -9,11 +11,14 @@
 #include "sort_types.h"
 
 #define KSORT_DEV "/dev/sort"
+
 #define TIMSORT 0
 #define LINUXSORT 1
 #define PDQSORT 2
 #define QSORT 3
 
+#define MAX_BYTES_PER_READ 8
+static unsigned char rx[MAX_BYTES_PER_READ]; /* Receive buffer from the LKM */
 
 typedef struct {
     unsigned long long qsort_user;
@@ -26,11 +31,18 @@ typedef struct {
 
 sorttime time_analysis(size_t);
 
+void zero_rx(void)
+{
+    for (int b_idx = 0; b_idx < MAX_BYTES_PER_READ; b_idx++) {
+        rx[b_idx] = 0;
+    }
+}
+
 int main()
 {
     FILE *file = fopen("output.csv", "w");
     sorttime result;
-    size_t start = 1000, end = 20000;
+    size_t start = 1000, end = 10000;
     size_t step = 500;
 
     for (size_t k = start; k <= end; k += step) {
@@ -47,11 +59,11 @@ int main()
 sorttime time_analysis(size_t num)
 {
     int fd = open(KSORT_DEV, O_RDWR);
+
     if (fd < 0) {
         perror("Failed to open character device");
         goto error;
     }
-
     bool pass = true;
 
     struct timespec start, end;
@@ -61,14 +73,34 @@ sorttime time_analysis(size_t num)
     size_t size = n_elements * sizeof(int);
     int *inbuf = malloc(size);
 
-
     if (!inbuf) {
         goto error;
     }
 
     { /*Timsort test*/
-        for (size_t i = 0; i < n_elements; i++)
-            inbuf[i] = rand() % n_elements;
+        // for (size_t i = 0; i < n_elements; i++){
+        //     inbuf[i] = rand() % n_elements;
+        // }
+        for (size_t n_bytes = 1; n_bytes <= n_elements; n_bytes++) {
+            /* Clear/zero the buffer before copying in read data. */
+            zero_rx();
+
+            /* Read the response from the LKM. */
+            ssize_t n_bytes_read = read(fd, rx, n_bytes);
+
+            if (0 > n_bytes_read) {
+                perror("Failed to read all bytes.");
+
+                goto error;
+            }
+
+            uint64_t value_ = 0;
+            for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
+                unsigned char b = rx[b_idx];
+                value_ |= ((uint64_t) b << (8 * b_idx));
+            }
+            inbuf[n_bytes - 1] = value_ % n_elements;
+        }
 
         sort_method_t method = TIMSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
@@ -111,8 +143,28 @@ sorttime time_analysis(size_t num)
     }
 
     { /*Linux sort test*/
-        for (size_t i = 0; i < n_elements; i++)
-            inbuf[i] = rand() % n_elements;
+        // for (size_t i = 0; i < n_elements; i++)
+        //     inbuf[i] = rand() % n_elements;
+        for (size_t n_bytes = 1; n_bytes <= n_elements; n_bytes++) {
+            /* Clear/zero the buffer before copying in read data. */
+            zero_rx();
+
+            /* Read the response from the LKM. */
+            ssize_t n_bytes_read = read(fd, rx, n_bytes);
+
+            if (0 > n_bytes_read) {
+                perror("Failed to read all bytes.");
+
+                goto error;
+            }
+
+            uint64_t value_ = 0;
+            for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
+                unsigned char b = rx[b_idx];
+                value_ |= ((uint64_t) b << (8 * b_idx));
+            }
+            inbuf[n_bytes - 1] = value_ % n_elements;
+        }
 
         sort_method_t method = LINUXSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
@@ -156,8 +208,28 @@ sorttime time_analysis(size_t num)
     }
 
     { /*qsort test*/
-        for (size_t i = 0; i < n_elements; i++)
-            inbuf[i] = rand() % n_elements;
+        // for (size_t i = 0; i < n_elements; i++)
+        //     inbuf[i] = rand() % n_elements;
+        for (size_t n_bytes = 1; n_bytes <= n_elements; n_bytes++) {
+            /* Clear/zero the buffer before copying in read data. */
+            zero_rx();
+
+            /* Read the response from the LKM. */
+            ssize_t n_bytes_read = read(fd, rx, n_bytes);
+
+            if (0 > n_bytes_read) {
+                perror("Failed to read all bytes.");
+
+                goto error;
+            }
+
+            uint64_t value_ = 0;
+            for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
+                unsigned char b = rx[b_idx];
+                value_ |= ((uint64_t) b << (8 * b_idx));
+            }
+            inbuf[n_bytes - 1] = value_ % n_elements;
+        }
 
         sort_method_t method = QSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
@@ -202,5 +274,7 @@ error:
     free(inbuf);
     if (fd > 0)
         close(fd);
+    // if (fdxoro > 0)
+    //     close(fdxoro);
     return time;
 }

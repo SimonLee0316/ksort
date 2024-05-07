@@ -40,11 +40,15 @@ rmmod:
 check: all
 	$(MAKE) insmod
 	sudo ./user
-	sudo ./test_xoro
+	# sudo ./test_xoro
 	$(MAKE) rmmod
 plot:
 	sudo gnuplot plot_script.gp
 
+rand : all
+	sudo insmod xoro.ko
+	sudo ./test_xoro
+	sudo rmmod xoro
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 	$(RM) user test_xoro

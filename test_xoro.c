@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     }
 
     /* Test reading different numbers of bytes. */
-    for (int n_bytes = 0; n_bytes < 10; n_bytes++) {
+    for (size_t n_bytes = 1; n_bytes < 70; n_bytes++) {
         /* Clear/zero the buffer before copying in read data. */
         zero_rx();
 
@@ -38,12 +38,11 @@ int main(int argc, char *argv[])
         }
 
         uint64_t value_ = 0;
-        for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
+        for (size_t b_idx = 0; b_idx < n_bytes_read; b_idx++) {
             unsigned char b = rx[b_idx];
             value_ |= ((uint64_t) b << (8 * b_idx));
         }
-        printf("n_bytes=%d n_bytes_read=%ld value=%016lx\n", n_bytes,
-               n_bytes_read, value_);
+        printf("value: %lu\n", value_);
     }
     fflush(stdout);
 
