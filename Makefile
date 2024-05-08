@@ -40,7 +40,6 @@ rmmod:
 check: all
 	$(MAKE) insmod
 	sudo ./user
-	# sudo ./test_xoro
 	$(MAKE) rmmod
 plot:
 	sudo gnuplot plot_script.gp

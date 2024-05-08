@@ -11,6 +11,7 @@
 #include "sort_types.h"
 
 #define KSORT_DEV "/dev/sort"
+#define XORO_DEV "/dev/xoro"
 
 #define TIMSORT 0
 #define LINUXSORT 1
@@ -42,7 +43,7 @@ int main()
 {
     FILE *file = fopen("output.csv", "w");
     sorttime result;
-    size_t start = 1000, end = 10000;
+    size_t start = 1000, end = 20000;
     size_t step = 500;
 
     for (size_t k = start; k <= end; k += step) {
@@ -59,8 +60,9 @@ int main()
 sorttime time_analysis(size_t num)
 {
     int fd = open(KSORT_DEV, O_RDWR);
+    int fdxoro = open(XORO_DEV, O_RDWR);
 
-    if (fd < 0) {
+    if (fd < 0 || fdxoro < 0) {
         perror("Failed to open character device");
         goto error;
     }
@@ -72,34 +74,36 @@ sorttime time_analysis(size_t num)
     size_t n_elements = num;
     size_t size = n_elements * sizeof(int);
     int *inbuf = malloc(size);
+    int *xorobuf = malloc(size);
 
-    if (!inbuf) {
+    if (!inbuf || !xorobuf) {
         goto error;
     }
 
+    for (size_t n_bytes = 1; n_bytes <= n_elements; n_bytes++) {
+        /* Clear/zero the buffer before copying in read data. */
+        zero_rx();
+
+        /* Read the response from the LKM. */
+        ssize_t n_bytes_read = read(fdxoro, rx, n_bytes);
+
+        if (0 > n_bytes_read) {
+            perror("Failed to read all bytes.");
+
+            goto error;
+        }
+
+        uint64_t value_ = 0;
+        for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
+            unsigned char b = rx[b_idx];
+            value_ |= ((uint64_t) b << (8 * b_idx));
+        }
+        xorobuf[n_bytes - 1] = value_ % n_elements;
+    }
+
     { /*Timsort test*/
-        // for (size_t i = 0; i < n_elements; i++){
-        //     inbuf[i] = rand() % n_elements;
-        // }
-        for (size_t n_bytes = 1; n_bytes <= n_elements; n_bytes++) {
-            /* Clear/zero the buffer before copying in read data. */
-            zero_rx();
-
-            /* Read the response from the LKM. */
-            ssize_t n_bytes_read = read(fd, rx, n_bytes);
-
-            if (0 > n_bytes_read) {
-                perror("Failed to read all bytes.");
-
-                goto error;
-            }
-
-            uint64_t value_ = 0;
-            for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
-                unsigned char b = rx[b_idx];
-                value_ |= ((uint64_t) b << (8 * b_idx));
-            }
-            inbuf[n_bytes - 1] = value_ % n_elements;
+        for (size_t i = 0; i < n_elements; i++) {
+            inbuf[i] = xorobuf[i];
         }
 
         sort_method_t method = TIMSORT;
@@ -143,28 +147,8 @@ sorttime time_analysis(size_t num)
     }
 
     { /*Linux sort test*/
-        // for (size_t i = 0; i < n_elements; i++)
-        //     inbuf[i] = rand() % n_elements;
-        for (size_t n_bytes = 1; n_bytes <= n_elements; n_bytes++) {
-            /* Clear/zero the buffer before copying in read data. */
-            zero_rx();
-
-            /* Read the response from the LKM. */
-            ssize_t n_bytes_read = read(fd, rx, n_bytes);
-
-            if (0 > n_bytes_read) {
-                perror("Failed to read all bytes.");
-
-                goto error;
-            }
-
-            uint64_t value_ = 0;
-            for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
-                unsigned char b = rx[b_idx];
-                value_ |= ((uint64_t) b << (8 * b_idx));
-            }
-            inbuf[n_bytes - 1] = value_ % n_elements;
-        }
+        for (size_t i = 0; i < n_elements; i++)
+            inbuf[i] = xorobuf[i];
 
         sort_method_t method = LINUXSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
@@ -208,28 +192,8 @@ sorttime time_analysis(size_t num)
     }
 
     { /*qsort test*/
-        // for (size_t i = 0; i < n_elements; i++)
-        //     inbuf[i] = rand() % n_elements;
-        for (size_t n_bytes = 1; n_bytes <= n_elements; n_bytes++) {
-            /* Clear/zero the buffer before copying in read data. */
-            zero_rx();
-
-            /* Read the response from the LKM. */
-            ssize_t n_bytes_read = read(fd, rx, n_bytes);
-
-            if (0 > n_bytes_read) {
-                perror("Failed to read all bytes.");
-
-                goto error;
-            }
-
-            uint64_t value_ = 0;
-            for (int b_idx = 0; b_idx < n_bytes_read; b_idx++) {
-                unsigned char b = rx[b_idx];
-                value_ |= ((uint64_t) b << (8 * b_idx));
-            }
-            inbuf[n_bytes - 1] = value_ % n_elements;
-        }
+        for (size_t i = 0; i < n_elements; i++)
+            inbuf[i] = xorobuf[i];
 
         sort_method_t method = QSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
@@ -272,9 +236,10 @@ sorttime time_analysis(size_t num)
     }
 error:
     free(inbuf);
+    free(xorobuf);
     if (fd > 0)
         close(fd);
-    // if (fdxoro > 0)
-    //     close(fdxoro);
+    if (fdxoro > 0)
+        close(fdxoro);
     return time;
 }
