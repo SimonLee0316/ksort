@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
@@ -102,9 +103,7 @@ sorttime time_analysis(size_t num)
     }
 
     { /*Timsort test*/
-        for (size_t i = 0; i < n_elements; i++) {
-            inbuf[i] = xorobuf[i];
-        }
+        memcpy(inbuf, xorobuf, size);
 
         sort_method_t method = TIMSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
@@ -147,8 +146,7 @@ sorttime time_analysis(size_t num)
     }
 
     { /*Linux sort test*/
-        for (size_t i = 0; i < n_elements; i++)
-            inbuf[i] = xorobuf[i];
+        memcpy(inbuf, xorobuf, size);
 
         sort_method_t method = LINUXSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
@@ -192,8 +190,7 @@ sorttime time_analysis(size_t num)
     }
 
     { /*qsort test*/
-        for (size_t i = 0; i < n_elements; i++)
-            inbuf[i] = xorobuf[i];
+        memcpy(inbuf, xorobuf, size);
 
         sort_method_t method = QSORT;
         if (write(fd, &method, sizeof(method)) != sizeof(method)) {
